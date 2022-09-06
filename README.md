@@ -1,1 +1,1 @@
-# GeometryModelingandProcessing-Labs
+# GeometryModelingAndProcessing-Labs
