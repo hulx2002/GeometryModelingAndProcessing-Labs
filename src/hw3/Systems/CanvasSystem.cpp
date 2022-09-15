@@ -25,14 +25,14 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			ImGui::Checkbox("Enable context menu", &data->opt_enable_context_menu);
 			ImGui::Text("Mouse Left: drag to add lines,\nMouse Right: drag to scroll, click for context menu.");
 
-			// Ñ¡Ôñ²ÎÊý»¯·½·¨
+			// Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			static int e = 0;
 			ImGui::RadioButton("Stop fitting", &e, 0);
 			ImGui::RadioButton("Uniform parameterization", &e, 1);
 			ImGui::RadioButton("Chordal parameterization", &e, 2);
 			ImGui::RadioButton("Centripetal parameterization", &e, 3);
 			ImGui::RadioButton("Foley parameterization", &e, 4);
-			// ÉèÖÃ²ÎÊýÖµ
+			// ï¿½ï¿½ï¿½Ã²ï¿½ï¿½ï¿½Öµ
 			static float sigma = 1.0f;
 			ImGui::SliderFloat("sigma", &sigma, 1.0f, 20.0f, "%.3f");
 
@@ -79,19 +79,19 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					data->adding_line = false;
 			}
 
-			// ²ÎÊý»¯
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			vector<float> t;
 			t.clear();
 			if (e > 0 && data->points.size() > 0)
 			{
-				// Uniform²ÎÊý»¯
+				// Uniformï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if (e == 1)
 				{
 					int n = data->points.size();
 					for (int i = 0; i < n; i++)
 						t.push_back(1.0f * i);
 				}
-				// Chordal²ÎÊý»¯
+				// Chordalï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				else if (e == 2)
 				{
 					float temp = 100.0f;
@@ -100,7 +100,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					for (int i = 1; i < n; i++)
 						t.push_back(t.back() + sqrt(pow(data->points[i][0] - data->points[i - 1][0], 2) + pow(data->points[i][1] - data->points[i - 1][1], 2)) / temp);
 				}
-				// Centripetal²ÎÊý»¯
+				// Centripetalï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				else if (e == 3)
 				{
 					float temp = 10.0f;
@@ -109,17 +109,17 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					for (int i = 1; i < n; i++)
 						t.push_back(t.back() + sqrt(sqrt(pow(data->points[i][0] - data->points[i - 1][0], 2) + pow(data->points[i][1] - data->points[i - 1][1], 2))) / temp);
 				}
-				// Foley²ÎÊý»¯
+				// Foleyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				else if (e == 4)
 				{
-					float temp = 100.0f;
+					float temp = 250.0f;
 					int n = data->points.size();
-					// ¼ÆËã¾àÀë
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					vector<float> dist;
 					dist.clear();
 					for (int i = 0; i < n - 1; i++)
 						dist.push_back(sqrt(pow(data->points[i + 1][0] - data->points[i][0], 2) + pow(data->points[i + 1][1] - data->points[i][1], 2)));
-					// ¼ÆËã¼Ð½Ç
+					// ï¿½ï¿½ï¿½ï¿½Ð½ï¿½
 					vector<float> alpha;
 					alpha.clear();
 					alpha.push_back(0.0f);
@@ -128,7 +128,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						alpha.push_back(acos(((data->points[i - 1][0] - data->points[i][0]) * (data->points[i + 1][0] - data->points[i][0]) + (data->points[i - 1][1] - data->points[i][1]) * (data->points[i + 1][1] - data->points[i][1])) / dist[i] / dist[i - 1]));
 						alpha.back() = (PI - alpha.back() < PI / 2.0f) ? (PI - alpha.back()) : (PI / 2.0f);
 					}
-					// ¼ÆËã²ÎÊý
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					t.push_back(0.0f);
 					for (int i = 0; i < n - 1; i++)
 					{
@@ -144,14 +144,14 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				}
 			}
 
-			// ÄâºÏ
-			// Gauss»ùº¯Êý²åÖµ
+			// ï¿½ï¿½ï¿½
+			// Gaussï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 			vector<pointf2> fitting_points;
 			fitting_points.clear();
 			if (e > 0 && data->points.size() > 0)
 			{
 				int n = data->points.size();
-				// ·Ö±ð¼ÆËãxºÍy¹ØÓÚtµÄÏµÊý
+				// ï¿½Ö±ï¿½ï¿½ï¿½ï¿½xï¿½ï¿½yï¿½ï¿½ï¿½ï¿½tï¿½ï¿½Ïµï¿½ï¿½
 				MatrixXf g(n, n);
 				for (size_t row = 0; row < n; row++)
 					for (size_t col = 0; col < n; col++)
@@ -164,7 +164,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				for (size_t row = 0; row < n; row++)
 					f_y(row, 0) = data->points[row][1];
 				MatrixXf b_y = g.colPivHouseholderQr().solve(f_y);
-				// ¶Ô²ÎÊýt¾ùÔÈ²ÉÑù
+				// ï¿½Ô²ï¿½ï¿½ï¿½tï¿½ï¿½ï¿½È²ï¿½ï¿½ï¿½
 				for (float t_iter = t[0]; t_iter <= t[n - 1]; t_iter += 0.01f)
 				{
 					float x = 0.0f;
@@ -210,12 +210,12 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				for (float y = fmodf(data->scrolling[1], GRID_STEP); y < canvas_sz.y; y += GRID_STEP)
 					draw_list->AddLine(ImVec2(canvas_p0.x, canvas_p0.y + y), ImVec2(canvas_p1.x, canvas_p0.y + y), IM_COL32(200, 200, 200, 40));
 			}
-			// ±ê¼ÇÔ­µã
+			// ï¿½ï¿½ï¿½Ô­ï¿½ï¿½
 			draw_list->AddCircle(ImVec2(origin.x, origin.y), 3, IM_COL32(255, 0, 0, 255), 0, 2.0f);
-			// ±ê¼ÇÊäÈëµã¼¯
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ã¼¯
 			for (int n = 0; n < data->points.size(); n++)
 				draw_list->AddCircle(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), 3, IM_COL32(255, 255, 0, 255), 0, 2.0f);
-			// Á¬½Ó²ÉÑùµã£¬»æÖÆÄâºÏº¯ÊýÍ¼Ïñ
+			// ï¿½ï¿½ï¿½Ó²ï¿½ï¿½ï¿½ï¿½ã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïºï¿½ï¿½ï¿½Í¼ï¿½ï¿½
 			for (int n = 0; n + 1 < fitting_points.size(); n++)
 				draw_list->AddLine(ImVec2(origin.x + fitting_points[n][0], origin.y + fitting_points[n][1]), ImVec2(origin.x + fitting_points[n + 1][0], origin.y + fitting_points[n + 1][1]), IM_COL32(255, 255, 0, 255), 2.0f);
 			draw_list->PopClipRect();
