@@ -23,10 +23,12 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			ImGui::Checkbox("Enable context menu", &data->opt_enable_context_menu);
 			ImGui::Text("Mouse Left: drag to add lines,\nMouse Right: drag to scroll, click for context menu.");
 
+			// 选择输入型值点、修改拖动型值点或编辑型值点处的切线信息
 			static int e_1 = 0;
 			ImGui::RadioButton("Add points", &e_1, 0);
 			ImGui::RadioButton("Edit points", &e_1, 1);
 			ImGui::RadioButton("Edit tangents", &e_1, 2);
+			// 编辑型值点处切线信息时，选择曲线几何连续性阶数
 			static int e_2 = 1;
 			ImGui::RadioButton("G1", &e_2, 1);
 			ImGui::RadioButton("G0", &e_2, 0);
@@ -65,6 +67,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			static int data_id = -1;
 			static int control_id = -1;
 			static vector<pointf2> control_points;
+			// 输入型值点
 			if (e_1 == 0)
 			{
 				if (is_hovered && !data->adding_line && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
@@ -78,11 +81,14 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						data->adding_line = false;
 				}
 			}
+			// 修改拖动型值点
 			else if (e_1 == 1)
 			{
 				int n = data->points.size() - 1;
+				// 鼠标左键点击
 				if (is_hovered && data_id == -1 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 				{
+					// 寻找距离点击位置最近的型值点
 					float min_dist = 3.0f;
 					for (int i = 0; i <= n; i++)
 						if (sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2)) < min_dist)
@@ -91,18 +97,25 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 							data_id = i;
 						}
 				}
+				// 鼠标拖动
 				if (data_id > -1)
 				{
+					// 根据拖动位置修改型值点位置
 					data->points[data_id] = mouse_pos_in_canvas;
+					// 鼠标左键松开
 					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						// 修改结束
 						data_id = -1;
 				}
 			}
+			// 编辑型值点处切线信息，曲线1阶几何连续
 			else if (e_1 == 2 && e_2 == 1)
 			{
 				int n = data->points.size() - 1;
+				// 鼠标左键点击
 				if (is_hovered && data_id == -1 && control_id == -1 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 				{
+					// 寻找距离点击位置最近的型值点或切线控制点
 					float min_dist = 3.0f;
 					for (int i = 0; i <= n; i++)
 						if (sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2)) < min_dist)
@@ -118,11 +131,14 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 							data_id = -1;
 						}
 				}
+				// 鼠标拖动，选中型值点
 				if (data_id > -1)
 				{
 					float delta_x = mouse_pos_in_canvas[0] - data->points[data_id][0];
 					float delta_y = mouse_pos_in_canvas[1] - data->points[data_id][1];
+					// 根据拖动位置修改型值点位置
 					data->points[data_id] = mouse_pos_in_canvas;
+					// 更新两侧切线控制点位置
 					if (data_id == 0)
 					{
 						control_points[0][0] += delta_x;
@@ -140,12 +156,17 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						control_points[2 * data_id][0] += delta_x;
 						control_points[2 * data_id][1] += delta_y;
 					}
+					// 鼠标左键松开
 					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						// 修改结束
 						data_id = -1;
 				}
+				// 鼠标拖动，选中切线控制点
 				if (control_id > -1)
 				{
+					// 根据拖动位置修改切线控制点信息
 					control_points[control_id] = mouse_pos_in_canvas;
+					// 更新另一侧切线控制点信息，保持另一侧切线大小不变且两侧切线方向连续
 					if (control_id != 0 && control_id != 2 * n - 1)
 					{
 						if (control_id % 2 == 0)
@@ -163,15 +184,20 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 							control_points[control_id + 1][1] = ((dist_1 + dist_2) * data->points[(control_id + 1) / 2][1] - dist_2 * control_points[control_id][1]) / dist_1;
 						}
 					}
+					// 鼠标左键松开
 					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						// 修改结束
 						control_id = -1;
 				}
 			}
+			// 编辑型值点处切线信息，曲线0阶几何连续
 			else if (e_1 == 2 && e_2 == 0)
 			{
 				int n = data->points.size() - 1;
+				// 鼠标左键点击
 				if (is_hovered && data_id == -1 && control_id == -1 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 				{
+					// 寻找距离点击位置最近的型值点或切线控制点
 					float min_dist = 3.0f;
 					for (int i = 0; i <= n; i++)
 						if (sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2)) < min_dist)
@@ -187,11 +213,14 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 							data_id = -1;
 						}
 				}
+				// 鼠标拖动，选中型值点
 				if (data_id > -1)
 				{
 					float delta_x = mouse_pos_in_canvas[0] - data->points[data_id][0];
 					float delta_y = mouse_pos_in_canvas[1] - data->points[data_id][1];
+					// 根据拖动位置修改型值点位置
 					data->points[data_id] = mouse_pos_in_canvas;
+					// 更新两侧切线控制点位置
 					if (data_id == 0)
 					{
 						control_points[0][0] += delta_x;
@@ -209,17 +238,24 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						control_points[2 * data_id][0] += delta_x;
 						control_points[2 * data_id][1] += delta_y;
 					}
+					// 鼠标左键松开
 					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						// 修改结束
 						data_id = -1;
 				}
+				// 鼠标拖动，选中切线控制点
 				if (control_id > -1)
 				{
+					// 根据拖动位置修改切线控制点信息
 					control_points[control_id] = mouse_pos_in_canvas;
+					// 鼠标左键松开
 					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						// 修改结束
 						control_id = -1;
 				}
 			}
 
+			// chordal参数化
 			vector<float> t;
 			t.clear();
 			if (data->points.size() >= 2)
@@ -233,16 +269,20 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 
 			vector<pointf2> fitting_points;
 			fitting_points.clear();
+			// 生成C2曲线
+			// 先求曲线，再更新切线控制点
 			if (e_1 == 0 || e_1 == 1)
 			{
 				if (data->points.size() == 2)
 				{
+					// 对参数t均匀采样
 					for (float t_iter = t[0]; t_iter <= t[1]; t_iter += 0.01f)
 					{
 						float x = data->points[1][0] / (t[1] - t[0]) * (t_iter - t[0]) + data->points[0][0] / (t[1] - t[0]) * (t[1] - t_iter);
 						float y = data->points[1][1] / (t[1] - t[0]) * (t_iter - t[0]) + data->points[0][1] / (t[1] - t[0]) * (t[1] - t_iter);
 						fitting_points.push_back(pointf2(x, y));
 					}
+					// 更新切线控制点位置
 					control_points.clear();
 					float x = data->points[1][0] / (t[1] - t[0]) - data->points[0][0] / (t[1] - t[0]) + data->points[0][0];
 					float y = data->points[1][1] / (t[1] - t[0]) - data->points[0][1] / (t[1] - t[0]) + data->points[0][1];
@@ -254,6 +294,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				else if (data->points.size() > 2)
 				{
 					int n = data->points.size() - 1;
+					// 求解线性方程组，得到三弯矩方程的系数
 					vector<float> h;
 					h.clear();
 					for (int i = 0; i <= n - 1; i++)
@@ -297,6 +338,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						V_y(i, 0) = v_y[i + 1];
 					MatrixXf M_x = A.colPivHouseholderQr().solve(V_x);
 					MatrixXf M_y = A.colPivHouseholderQr().solve(V_y);
+					// 对参数t分段均匀采样
 					for (int i = 0; i < n; i++)
 					{
 						for (float t_iter = t[i]; t_iter <= t[i + 1]; t_iter += 0.01f)
@@ -319,6 +361,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 							fitting_points.push_back(pointf2(x, y));
 						}
 					}
+					// 更新切线控制点位置
 					control_points.clear();
 					for (int i = 0; i < n; i++)
 					{
@@ -352,11 +395,15 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					}
 				}
 			}
+			// 生成G1或G0曲线
+			// 根据切线控制点求曲线
 			else if (e_2 == 1 || e_2 == 0)
 			{
 			    int n = data->points.size() - 1;
+				// 分段单独处理
 			    for (int i = 0; i < n; i++)
 			    {
+					// 已知两端点取值及一阶导数，求三次函数
 					MatrixXf A(4, 4);
 					A(0, 0) = 1;
 					A(0, 1) = t[i];
@@ -386,6 +433,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					V_y(3, 0) = -control_points[2 * i + 1][1] + data->points[i + 1][1];
 					MatrixXf M_x = A.colPivHouseholderQr().solve(V_x);
 					MatrixXf M_y = A.colPivHouseholderQr().solve(V_y);
+					// 对参数t均匀采样
 					for (float t_iter = t[i]; t_iter <= t[i + 1]; t_iter += 0.01f)
 					{
 						float x = M_x(0, 0) + M_x(1, 0) * t_iter + M_x(2, 0) * pow(t_iter, 2) + M_x(3, 0) * pow(t_iter, 3);
@@ -430,7 +478,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			}
 			// 标记原点
 			draw_list->AddCircle(ImVec2(origin.x, origin.y), 3, IM_COL32(255, 0, 0, 255), 0, 2.0f);
-			// 标记输入点集
+			// 标记输入点集，已选中点标记为蓝色，未选中点标记为黄色
 			for (int n = 0; n < data->points.size(); n++)
 				if (n == data_id)
 					draw_list->AddCircle(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), 3, IM_COL32(0, 0, 255, 255), 0, 2.0f);
@@ -439,6 +487,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			// 连接采样点，绘制拟合函数图像
 			for (int n = 0; n + 1 < fitting_points.size(); n++)
 				draw_list->AddLine(ImVec2(origin.x + fitting_points[n][0], origin.y + fitting_points[n][1]), ImVec2(origin.x + fitting_points[n + 1][0], origin.y + fitting_points[n + 1][1]), IM_COL32(255, 255, 0, 255), 2.0f);
+			// 编辑型值点处切线信息时，标记切线控制点，已选中点标记为蓝色，未选中点标记为绿色
 			if (e_1 == 2)
 			{
 				int n = data->points.size() - 1;
