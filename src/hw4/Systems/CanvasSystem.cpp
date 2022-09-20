@@ -23,9 +23,13 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			ImGui::Checkbox("Enable context menu", &data->opt_enable_context_menu);
 			ImGui::Text("Mouse Left: drag to add lines,\nMouse Right: drag to scroll, click for context menu.");
 
-			static int e = 0;
-			ImGui::RadioButton("Stop fitting", &e, 0);
-			ImGui::RadioButton("Start fitting", &e, 1);
+			static int e_1 = 0;
+			ImGui::RadioButton("Add points", &e_1, 0);
+			ImGui::RadioButton("Edit points", &e_1, 1);
+			ImGui::RadioButton("Edit tangents", &e_1, 2);
+			static int e_2 = 1;
+			ImGui::RadioButton("G1", &e_2, 1);
+			ImGui::RadioButton("G0", &e_2, 0);
 
 			// Typically you would use a BeginChild()/EndChild() pair to benefit from a clipping region + own scrolling.
 			// Here we demonstrate that this can be replaced by simple offsetting + custom drawing + PushClipRect/PopClipRect() calls.
@@ -58,21 +62,167 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			const ImVec2 origin(canvas_p0.x + data->scrolling[0], canvas_p0.y + data->scrolling[1]); // Lock scrolled origin
 			const pointf2 mouse_pos_in_canvas(io.MousePos.x - origin.x, io.MousePos.y - origin.y);
 
-			// Add first and second point
-			if (is_hovered && !data->adding_line && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			static int data_id = -1;
+			static int control_id = -1;
+			static vector<pointf2> control_points;
+			if (e_1 == 0)
 			{
-				data->points.push_back(mouse_pos_in_canvas);
-				data->adding_line = true;
+				if (is_hovered && !data->adding_line && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+				{
+					data->points.push_back(mouse_pos_in_canvas);
+					data->adding_line = true;
+				}
+				if (data->adding_line)
+				{
+					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						data->adding_line = false;
+				}
 			}
-			if (data->adding_line)
+			else if (e_1 == 1)
 			{
-				if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
-					data->adding_line = false;
+				int n = data->points.size() - 1;
+				if (is_hovered && data_id == -1 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+				{
+					float min_dist = 3.0f;
+					for (int i = 0; i <= n; i++)
+						if (sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2)) < min_dist)
+						{
+							min_dist = sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2));
+							data_id = i;
+						}
+				}
+				if (data_id > -1)
+				{
+					data->points[data_id] = mouse_pos_in_canvas;
+					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						data_id = -1;
+				}
+			}
+			else if (e_1 == 2 && e_2 == 1)
+			{
+				int n = data->points.size() - 1;
+				if (is_hovered && data_id == -1 && control_id == -1 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+				{
+					float min_dist = 3.0f;
+					for (int i = 0; i <= n; i++)
+						if (sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2)) < min_dist)
+						{
+							min_dist = sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2));
+							data_id = i;
+						}
+					for (int i = 0; i <= 2 * n - 1; i++)
+						if (sqrt(pow(mouse_pos_in_canvas[0] - control_points[i][0], 2) + pow(mouse_pos_in_canvas[1] - control_points[i][1], 2)) < min_dist)
+						{
+							min_dist = sqrt(pow(mouse_pos_in_canvas[0] - control_points[i][0], 2) + pow(mouse_pos_in_canvas[1] - control_points[i][1], 2));
+							control_id = i;
+							data_id = -1;
+						}
+				}
+				if (data_id > -1)
+				{
+					float delta_x = mouse_pos_in_canvas[0] - data->points[data_id][0];
+					float delta_y = mouse_pos_in_canvas[1] - data->points[data_id][1];
+					data->points[data_id] = mouse_pos_in_canvas;
+					if (data_id == 0)
+					{
+						control_points[0][0] += delta_x;
+						control_points[0][1] += delta_y;
+					}
+					else if (data_id == n)
+					{
+						control_points[2 * n - 1][0] += delta_x;
+						control_points[2 * n - 1][1] += delta_y;
+					}
+					else
+					{
+						control_points[2 * data_id - 1][0] += delta_x;
+						control_points[2 * data_id - 1][1] += delta_y;
+						control_points[2 * data_id][0] += delta_x;
+						control_points[2 * data_id][1] += delta_y;
+					}
+					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						data_id = -1;
+				}
+				if (control_id > -1)
+				{
+					control_points[control_id] = mouse_pos_in_canvas;
+					if (control_id != 0 && control_id != 2 * n - 1)
+					{
+						if (control_id % 2 == 0)
+						{
+							float dist_1 = sqrt(pow(control_points[control_id][0] - data->points[control_id / 2][0], 2) + pow(control_points[control_id][1] - data->points[control_id / 2][1], 2));
+							float dist_2 = sqrt(pow(control_points[control_id - 1][0] - data->points[control_id / 2][0], 2) + pow(control_points[control_id - 1][1] - data->points[control_id / 2][1], 2));
+							control_points[control_id - 1][0] = ((dist_1 + dist_2) * data->points[control_id / 2][0] - dist_2 * control_points[control_id][0]) / dist_1;
+							control_points[control_id - 1][1] = ((dist_1 + dist_2) * data->points[control_id / 2][1] - dist_2 * control_points[control_id][1]) / dist_1;
+						}
+						else
+						{
+							float dist_1 = sqrt(pow(control_points[control_id][0] - data->points[(control_id + 1) / 2][0], 2) + pow(control_points[control_id][1] - data->points[(control_id + 1) / 2][1], 2));
+							float dist_2 = sqrt(pow(control_points[control_id + 1][0] - data->points[(control_id + 1) / 2][0], 2) + pow(control_points[control_id + 1][1] - data->points[(control_id + 1) / 2][1], 2));
+							control_points[control_id + 1][0] = ((dist_1 + dist_2) * data->points[(control_id + 1) / 2][0] - dist_2 * control_points[control_id][0]) / dist_1;
+							control_points[control_id + 1][1] = ((dist_1 + dist_2) * data->points[(control_id + 1) / 2][1] - dist_2 * control_points[control_id][1]) / dist_1;
+						}
+					}
+					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						control_id = -1;
+				}
+			}
+			else if (e_1 == 2 && e_2 == 0)
+			{
+				int n = data->points.size() - 1;
+				if (is_hovered && data_id == -1 && control_id == -1 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+				{
+					float min_dist = 3.0f;
+					for (int i = 0; i <= n; i++)
+						if (sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2)) < min_dist)
+						{
+							min_dist = sqrt(pow(mouse_pos_in_canvas[0] - data->points[i][0], 2) + pow(mouse_pos_in_canvas[1] - data->points[i][1], 2));
+							data_id = i;
+						}
+					for (int i = 0; i <= 2 * n - 1; i++)
+						if (sqrt(pow(mouse_pos_in_canvas[0] - control_points[i][0], 2) + pow(mouse_pos_in_canvas[1] - control_points[i][1], 2)) < min_dist)
+						{
+							min_dist = sqrt(pow(mouse_pos_in_canvas[0] - control_points[i][0], 2) + pow(mouse_pos_in_canvas[1] - control_points[i][1], 2));
+							control_id = i;
+							data_id = -1;
+						}
+				}
+				if (data_id > -1)
+				{
+					float delta_x = mouse_pos_in_canvas[0] - data->points[data_id][0];
+					float delta_y = mouse_pos_in_canvas[1] - data->points[data_id][1];
+					data->points[data_id] = mouse_pos_in_canvas;
+					if (data_id == 0)
+					{
+						control_points[0][0] += delta_x;
+						control_points[0][1] += delta_y;
+					}
+					else if (data_id == n)
+					{
+						control_points[2 * n - 1][0] += delta_x;
+						control_points[2 * n - 1][1] += delta_y;
+					}
+					else
+					{
+						control_points[2 * data_id - 1][0] += delta_x;
+						control_points[2 * data_id - 1][1] += delta_y;
+						control_points[2 * data_id][0] += delta_x;
+						control_points[2 * data_id][1] += delta_y;
+					}
+					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						data_id = -1;
+				}
+				if (control_id > -1)
+				{
+					control_points[control_id] = mouse_pos_in_canvas;
+					if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+						control_id = -1;
+				}
 			}
 
 			vector<float> t;
 			t.clear();
-			if (e > 0 && data->points.size() > 0)
+			if (data->points.size() >= 2)
 			{
 				float temp = 100.0f;
 				int n = data->points.size() - 1;
@@ -83,84 +233,167 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 
 			vector<pointf2> fitting_points;
 			fitting_points.clear();
-			if (e > 0 && data->points.size() == 2)
+			if (e_1 == 0 || e_1 == 1)
 			{
-				for (float t_iter = t[0]; t_iter <= t[1]; t_iter += 0.01f)
+				if (data->points.size() == 2)
 				{
-					float x = data->points[1][0] / (t[1] - t[0]) * (t_iter - t[0]) + data->points[0][0] / (t[1] - t[0]) * (t[1] - t_iter);
-					float y = data->points[1][1] / (t[1] - t[0]) * (t_iter - t[0]) + data->points[0][1] / (t[1] - t[0]) * (t[1] - t_iter);
-					fitting_points.push_back(pointf2(x, y));
-				}
-			}
-			else if (e > 0 && data->points.size() > 2)
-			{
-				int n = data->points.size() - 1;
-				vector<float> h;
-				h.clear();
-				for (int i = 0; i <= n - 1; i++)
-					h.push_back(t[i + 1] - t[i]);
-				vector<float> u;
-				u.clear();
-				u.push_back(0.0f);
-				for (int i = 1; i <= n - 1; i++)
-					u.push_back(2 * (h[i] + h[i - 1]));
-				vector<float> b_x;
-				b_x.clear();
-				for (int i = 0; i <= n - 1; i++)
-					b_x.push_back(6 / h[i] * (data->points[i + 1][0] - data->points[i][0]));
-				vector<float> b_y;
-				b_y.clear();
-				for (int i = 0; i <= n - 1; i++)
-					b_y.push_back(6 / h[i] * (data->points[i + 1][1] - data->points[i][1]));
-				vector<float> v_x;
-				v_x.clear();
-				v_x.push_back(0.0f);
-				for (int i = 1; i <= n - 1; i++)
-					v_x.push_back(b_x[i] - b_x[i - 1]);
-				vector<float> v_y;
-				v_y.clear();
-				v_y.push_back(0.0f);
-				for (int i = 1; i <= n - 1; i++)
-					v_y.push_back(b_y[i] - b_y[i - 1]);
-				MatrixXf A = MatrixXf::Zero(n - 1, n - 1);
-				for (size_t i = 0; i < n - 1; i++)
-					A(i, i) = u[i + 1];
-				for (size_t i = 0; i < n - 2; i++)
-				{
-					A(i, i + 1) = h[i + 1];
-					A(i + 1, i) = h[i + 1];
-				}
-				MatrixXf V_x(n - 1, 1);
-				for (size_t i = 0; i < n - 1; i++)
-					V_x(i, 0) = v_x[i + 1];
-				MatrixXf V_y(n - 1, 1);
-				for (size_t i = 0; i < n - 1; i++)
-					V_y(i, 0) = v_y[i + 1];
-				MatrixXf M_x = A.colPivHouseholderQr().solve(V_x);
-				MatrixXf M_y = A.colPivHouseholderQr().solve(V_y);
-				for (int i = 0; i < n; i++)
-				{
-					for (float t_iter = t[i]; t_iter <= t[i + 1]; t_iter += 0.01f)
+					for (float t_iter = t[0]; t_iter <= t[1]; t_iter += 0.01f)
 					{
-						float x, y;
+						float x = data->points[1][0] / (t[1] - t[0]) * (t_iter - t[0]) + data->points[0][0] / (t[1] - t[0]) * (t[1] - t_iter);
+						float y = data->points[1][1] / (t[1] - t[0]) * (t_iter - t[0]) + data->points[0][1] / (t[1] - t[0]) * (t[1] - t_iter);
+						fitting_points.push_back(pointf2(x, y));
+					}
+					control_points.clear();
+					float x = data->points[1][0] / (t[1] - t[0]) - data->points[0][0] / (t[1] - t[0]) + data->points[0][0];
+					float y = data->points[1][1] / (t[1] - t[0]) - data->points[0][1] / (t[1] - t[0]) + data->points[0][1];
+					control_points.push_back(pointf2(x, y));
+					x = -data->points[1][0] / (t[1] - t[0]) + data->points[0][0] / (t[1] - t[0]) + data->points[1][0];
+					y = -data->points[1][1] / (t[1] - t[0]) + data->points[0][1] / (t[1] - t[0]) + data->points[1][1];
+					control_points.push_back(pointf2(x, y));
+				}
+				else if (data->points.size() > 2)
+				{
+					int n = data->points.size() - 1;
+					vector<float> h;
+					h.clear();
+					for (int i = 0; i <= n - 1; i++)
+						h.push_back(t[i + 1] - t[i]);
+					vector<float> u;
+					u.clear();
+					u.push_back(0.0f);
+					for (int i = 1; i <= n - 1; i++)
+						u.push_back(2 * (h[i] + h[i - 1]));
+					vector<float> b_x;
+					b_x.clear();
+					for (int i = 0; i <= n - 1; i++)
+						b_x.push_back(6 / h[i] * (data->points[i + 1][0] - data->points[i][0]));
+					vector<float> b_y;
+					b_y.clear();
+					for (int i = 0; i <= n - 1; i++)
+						b_y.push_back(6 / h[i] * (data->points[i + 1][1] - data->points[i][1]));
+					vector<float> v_x;
+					v_x.clear();
+					v_x.push_back(0.0f);
+					for (int i = 1; i <= n - 1; i++)
+						v_x.push_back(b_x[i] - b_x[i - 1]);
+					vector<float> v_y;
+					v_y.clear();
+					v_y.push_back(0.0f);
+					for (int i = 1; i <= n - 1; i++)
+						v_y.push_back(b_y[i] - b_y[i - 1]);
+					MatrixXf A = MatrixXf::Zero(n - 1, n - 1);
+					for (size_t i = 0; i < n - 1; i++)
+						A(i, i) = u[i + 1];
+					for (size_t i = 0; i < n - 2; i++)
+					{
+						A(i, i + 1) = h[i + 1];
+						A(i + 1, i) = h[i + 1];
+					}
+					MatrixXf V_x(n - 1, 1);
+					for (size_t i = 0; i < n - 1; i++)
+						V_x(i, 0) = v_x[i + 1];
+					MatrixXf V_y(n - 1, 1);
+					for (size_t i = 0; i < n - 1; i++)
+						V_y(i, 0) = v_y[i + 1];
+					MatrixXf M_x = A.colPivHouseholderQr().solve(V_x);
+					MatrixXf M_y = A.colPivHouseholderQr().solve(V_y);
+					for (int i = 0; i < n; i++)
+					{
+						for (float t_iter = t[i]; t_iter <= t[i + 1]; t_iter += 0.01f)
+						{
+							float x, y;
+							if (i == 0)
+							{
+								x = M_x(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][0] / h[i] - M_x(i, 0) * h[i] / 6) * (t_iter - t[i]) + data->points[i][0] / h[i] * (t[i + 1] - t_iter);
+								y = M_y(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][1] / h[i] - M_y(i, 0) * h[i] / 6) * (t_iter - t[i]) + data->points[i][1] / h[i] * (t[i + 1] - t_iter);
+							}
+							else if (i == n - 1)
+							{
+								x = M_x(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + data->points[i + 1][0] / h[i] * (t_iter - t[i]) + (data->points[i][0] / h[i] - M_x(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
+								y = M_y(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + data->points[i + 1][1] / h[i] * (t_iter - t[i]) + (data->points[i][1] / h[i] - M_y(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
+							}
+							else {
+								x = M_x(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + M_x(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][0] / h[i] - M_x(i, 0) * h[i] / 6) * (t_iter - t[i]) + (data->points[i][0] / h[i] - M_x(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
+								y = M_y(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + M_y(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][1] / h[i] - M_y(i, 0) * h[i] / 6) * (t_iter - t[i]) + (data->points[i][1] / h[i] - M_y(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
+							}
+							fitting_points.push_back(pointf2(x, y));
+						}
+					}
+					control_points.clear();
+					for (int i = 0; i < n; i++)
+					{
 						if (i == 0)
 						{
-							x = M_x(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][0] / h[i] - M_x(i, 0) * h[i] / 6) * (t_iter - t[i]) + data->points[i][0] / h[i] * (t[i + 1] - t_iter);
-							y = M_y(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][1] / h[i] - M_y(i, 0) * h[i] / 6) * (t_iter - t[i]) + data->points[i][1] / h[i] * (t[i + 1] - t_iter);
+							float x = -h[i] / 6 * M_x(i, 0) - data->points[i][0] / h[i] + data->points[i + 1][0] / h[i] + data->points[i][0];
+							float y = -h[i] / 6 * M_y(i, 0) - data->points[i][1] / h[i] + data->points[i + 1][1] / h[i] + data->points[i][1];
+							control_points.push_back(pointf2(x, y));
+							x = - h[i] / 3 * M_x(i, 0) + data->points[i][0] / h[i] - data->points[i + 1][0] / h[i] + data->points[i + 1][0];
+							y = - h[i] / 3 * M_y(i, 0) + data->points[i][1] / h[i] - data->points[i + 1][1] / h[i] + data->points[i + 1][1];
+							control_points.push_back(pointf2(x, y));
 						}
 						else if (i == n - 1)
 						{
-							x = M_x(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + data->points[i + 1][0] / h[i] * (t_iter - t[i]) + (data->points[i][0] / h[i] - M_x(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
-							y = M_y(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + data->points[i + 1][1] / h[i] * (t_iter - t[i]) + (data->points[i][1] / h[i] - M_y(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
+							float x = -h[i] / 3 * M_x(i - 1, 0) - data->points[i][0] / h[i] + data->points[i + 1][0] / h[i] + data->points[i][0];
+							float y = -h[i] / 3 * M_y(i - 1, 0) - data->points[i][1] / h[i] + data->points[i + 1][1] / h[i] + data->points[i][1];
+							control_points.push_back(pointf2(x, y));
+							x = -h[i] / 6 * M_x(i - 1, 0) + data->points[i][0] / h[i] - data->points[i + 1][0] / h[i] + data->points[i + 1][0];
+							y = -h[i] / 6 * M_y(i - 1, 0) + data->points[i][1] / h[i] - data->points[i + 1][1] / h[i] + data->points[i + 1][1];
+							control_points.push_back(pointf2(x, y));
 						}
-						else {
-							x = M_x(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + M_x(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][0] / h[i] - M_x(i, 0) * h[i] / 6) * (t_iter - t[i]) + (data->points[i][0] / h[i] - M_x(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
-							y = M_y(i - 1, 0) / (6 * h[i]) * pow(t[i + 1] - t_iter, 3) + M_y(i, 0) / (6 * h[i]) * pow(t_iter - t[i], 3) + (data->points[i + 1][1] / h[i] - M_y(i, 0) * h[i] / 6) * (t_iter - t[i]) + (data->points[i][1] / h[i] - M_y(i - 1, 0) * h[i] / 6) * (t[i + 1] - t_iter);
+						else
+						{
+							float x = -h[i] / 3 * M_x(i - 1, 0) - h[i] / 6 * M_x(i, 0) - data->points[i][0] / h[i] + data->points[i + 1][0] / h[i] + data->points[i][0];
+							float y = -h[i] / 3 * M_y(i - 1, 0) - h[i] / 6 * M_y(i, 0) - data->points[i][1] / h[i] + data->points[i + 1][1] / h[i] + data->points[i][1];
+							control_points.push_back(pointf2(x, y));
+							x = -h[i] / 6 * M_x(i - 1, 0) - h[i] / 3 * M_x(i, 0) + data->points[i][0] / h[i] - data->points[i + 1][0] / h[i] + data->points[i + 1][0];
+							y = -h[i] / 6 * M_y(i - 1, 0) - h[i] / 3 * M_y(i, 0) + data->points[i][1] / h[i] - data->points[i + 1][1] / h[i] + data->points[i + 1][1];
+							control_points.push_back(pointf2(x, y));
 						}
-						fitting_points.push_back(pointf2(x, y));
 					}
 				}
 			}
+			else if (e_2 == 1 || e_2 == 0)
+			{
+			    int n = data->points.size() - 1;
+			    for (int i = 0; i < n; i++)
+			    {
+					MatrixXf A(4, 4);
+					A(0, 0) = 1;
+					A(0, 1) = t[i];
+					A(0, 2) = pow(t[i], 2);
+					A(0, 3) = pow(t[i], 3);
+					A(1, 0) = 1;
+					A(1, 1) = t[i + 1];
+					A(1, 2) = pow(t[i + 1], 2);
+					A(1, 3) = pow(t[i + 1], 3);
+					A(2, 0) = 0;
+					A(2, 1) = 1;
+					A(2, 2) = 2 * t[i];
+					A(2, 3) = 3 * pow(t[i], 2);
+					A(3, 0) = 0;
+					A(3, 1) = 1;
+					A(3, 2) = 2 * t[i + 1];
+					A(3, 3) = 3 * pow(t[i + 1], 2);
+					MatrixXf V_x(4, 1);
+					V_x(0, 0) = data->points[i][0];
+					V_x(1, 0) = data->points[i + 1][0];
+					V_x(2, 0) = control_points[2 * i][0] - data->points[i][0];
+					V_x(3, 0) = -control_points[2 * i + 1][0] + data->points[i + 1][0];
+					MatrixXf V_y(4, 1);
+					V_y(0, 0) = data->points[i][1];
+					V_y(1, 0) = data->points[i + 1][1];
+					V_y(2, 0) = control_points[2 * i][1] - data->points[i][1];
+					V_y(3, 0) = -control_points[2 * i + 1][1] + data->points[i + 1][1];
+					MatrixXf M_x = A.colPivHouseholderQr().solve(V_x);
+					MatrixXf M_y = A.colPivHouseholderQr().solve(V_y);
+					for (float t_iter = t[i]; t_iter <= t[i + 1]; t_iter += 0.01f)
+					{
+						float x = M_x(0, 0) + M_x(1, 0) * t_iter + M_x(2, 0) * pow(t_iter, 2) + M_x(3, 0) * pow(t_iter, 3);
+						float y = M_y(0, 0) + M_y(1, 0) * t_iter + M_y(2, 0) * pow(t_iter, 2) + M_y(3, 0) * pow(t_iter, 3);
+						fitting_points.push_back(pointf2(x, y));
+					}
+			    }
+            }
 
 			// Pan (we use a zero mouse threshold when there's no context menu)
 			// You may decide to make that threshold dynamic based on whether the mouse is hovering something etc.
@@ -199,10 +432,30 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			draw_list->AddCircle(ImVec2(origin.x, origin.y), 3, IM_COL32(255, 0, 0, 255), 0, 2.0f);
 			// 标记输入点集
 			for (int n = 0; n < data->points.size(); n++)
-				draw_list->AddCircle(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), 3, IM_COL32(255, 255, 0, 255), 0, 2.0f);
+				if (n == data_id)
+					draw_list->AddCircle(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), 3, IM_COL32(0, 0, 255, 255), 0, 2.0f);
+				else
+					draw_list->AddCircle(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), 3, IM_COL32(255, 255, 0, 255), 0, 2.0f);
 			// 连接采样点，绘制拟合函数图像
 			for (int n = 0; n + 1 < fitting_points.size(); n++)
 				draw_list->AddLine(ImVec2(origin.x + fitting_points[n][0], origin.y + fitting_points[n][1]), ImVec2(origin.x + fitting_points[n + 1][0], origin.y + fitting_points[n + 1][1]), IM_COL32(255, 255, 0, 255), 2.0f);
+			if (e_1 == 2)
+			{
+				int n = data->points.size() - 1;
+				for (int i = 0; i < n; i++)
+				{
+					if (2 * i == control_id)
+						draw_list->AddCircle(ImVec2(origin.x + control_points[2 * i][0], origin.y + control_points[2 * i][1]), 3, IM_COL32(0, 0, 255, 255), 0, 2.0f);
+					else
+						draw_list->AddCircle(ImVec2(origin.x + control_points[2 * i][0], origin.y + control_points[2 * i][1]), 3, IM_COL32(0, 255, 0, 255), 0, 2.0f);
+					draw_list->AddLine(ImVec2(origin.x + control_points[2 * i][0], origin.y + control_points[2 * i][1]), ImVec2(origin.x + data->points[i][0], origin.y + data->points[i][1]), IM_COL32(0, 255, 0, 255), 2.0f);
+					if (2 * i + 1 == control_id)
+						draw_list->AddCircle(ImVec2(origin.x + control_points[2 * i + 1][0], origin.y + control_points[2 * i + 1][1]), 3, IM_COL32(0, 0, 255, 255), 0, 2.0f);
+					else
+						draw_list->AddCircle(ImVec2(origin.x + control_points[2 * i + 1][0], origin.y + control_points[2 * i + 1][1]), 3, IM_COL32(0, 255, 0, 255), 0, 2.0f);
+					draw_list->AddLine(ImVec2(origin.x + control_points[2 * i + 1][0], origin.y + control_points[2 * i + 1][1]), ImVec2(origin.x + data->points[i + 1][0], origin.y + data->points[i + 1][1]), IM_COL32(0, 255, 0, 255), 2.0f);
+				}
+			}
 			draw_list->PopClipRect();
 		}
 
