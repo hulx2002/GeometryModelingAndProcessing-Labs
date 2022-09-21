@@ -399,10 +399,10 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			// 根据切线控制点求曲线
 			else if (e_2 == 1 || e_2 == 0)
 			{
-			    int n = data->points.size() - 1;
+				int n = data->points.size() - 1;
 				// 分段单独处理
-			    for (int i = 0; i < n; i++)
-			    {
+				for (int i = 0; i < n; i++)
+				{
 					// 已知两端点取值及一阶导数，求三次函数
 					MatrixXf A(4, 4);
 					A(0, 0) = 1;
@@ -440,8 +440,8 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						float y = M_y(0, 0) + M_y(1, 0) * t_iter + M_y(2, 0) * pow(t_iter, 2) + M_y(3, 0) * pow(t_iter, 3);
 						fitting_points.push_back(pointf2(x, y));
 					}
-			    }
-            }
+				}
+			}
 
 			// Pan (we use a zero mouse threshold when there's no context menu)
 			// You may decide to make that threshold dynamic based on whether the mouse is hovering something etc.
