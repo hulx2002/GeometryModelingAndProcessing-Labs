@@ -5,6 +5,7 @@
 #include <_deps/imgui/imgui.h>
 
 using namespace Ubpa;
+using namespace std;
 
 void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 	schedule.RegisterCommand([](Ubpa::UECS::World* w) {
@@ -16,6 +17,20 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			ImGui::Checkbox("Enable grid", &data->opt_enable_grid);
 			ImGui::Checkbox("Enable context menu", &data->opt_enable_context_menu);
 			ImGui::Text("Mouse Left: drag to add lines,\nMouse Right: drag to scroll, click for context menu.");
+
+			static int e_1 = 0;
+			ImGui::RadioButton("stop subdivision", &e_1, 0);
+			ImGui::RadioButton("approach chaikin", &e_1, 1);
+			ImGui::RadioButton("approach cubicbspline", &e_1, 2);
+			ImGui::RadioButton("interpolation 4points", &e_1, 3);
+			static int e_2 = 0;
+			ImGui::RadioButton("open curve", &e_2, 0);
+			ImGui::RadioButton("closed curve", &e_2, 1);
+
+			static int iterations = 0;
+			ImGui::SliderInt("iterations", &iterations, 0, 10);
+			static float alpha = 0.0f;
+			ImGui::SliderFloat("alpha", &alpha, 0.0f, 0.125f, "%.3f");
 
 			// Typically you would use a BeginChild()/EndChild() pair to benefit from a clipping region + own scrolling.
 			// Here we demonstrate that this can be replaced by simple offsetting + custom drawing + PushClipRect/PopClipRect() calls.
@@ -52,14 +67,122 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			if (is_hovered && !data->adding_line && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
 				data->points.push_back(mouse_pos_in_canvas);
-				data->points.push_back(mouse_pos_in_canvas);
 				data->adding_line = true;
 			}
 			if (data->adding_line)
 			{
-				data->points.back() = mouse_pos_in_canvas;
 				if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
 					data->adding_line = false;
+			}
+
+			vector<pointf2> fitting_points;
+			fitting_points.clear();
+			if (e_1 > 0 && data->points.size() >= 2)
+			{
+				if (e_1 == 1)
+				{
+					fitting_points = data->points;
+					for (int count = 0; count < iterations; count++)
+					{
+						int n = fitting_points.size();
+						vector<pointf2> temp;
+						temp.clear();
+						for (int i = 0; i < n - 1; i++)
+						{
+							float x = 3.0f / 4.0f * fitting_points[i][0] + 1.0f / 4.0f * fitting_points[i + 1][0];
+							float y = 3.0f / 4.0f * fitting_points[i][1] + 1.0f / 4.0f * fitting_points[i + 1][1];
+							temp.push_back(pointf2(x, y));
+							x = 1.0f / 4.0f * fitting_points[i][0] + 3.0f / 4.0f * fitting_points[i + 1][0];
+							y = 1.0f / 4.0f * fitting_points[i][1] + 3.0f / 4.0f * fitting_points[i + 1][1];
+							temp.push_back(pointf2(x, y));
+						}
+						if (e_2 == 1 && n >= 3)
+						{
+							float x = 3.0f / 4.0f * fitting_points[n - 1][0] + 1.0f / 4.0f * fitting_points[0][0];
+							float y = 3.0f / 4.0f * fitting_points[n - 1][1] + 1.0f / 4.0f * fitting_points[0][1];
+							temp.push_back(pointf2(x, y));
+							x = 1.0f / 4.0f * fitting_points[n - 1][0] + 3.0f / 4.0f * fitting_points[0][0];
+							y = 1.0f / 4.0f * fitting_points[n - 1][1] + 3.0f / 4.0f * fitting_points[0][1];
+							temp.push_back(pointf2(x, y));
+						}
+						fitting_points = temp;
+					}
+				}
+				else if (e_1 == 2)
+				{
+					fitting_points = data->points;
+					for (int count = 0; count < iterations; count++)
+					{
+						int n = fitting_points.size();
+						vector<pointf2> temp;
+						temp.clear();
+						for (int i = 0; i < n - 2; i++)
+						{
+							float x = 1.0f / 2.0f * fitting_points[i][0] + 1.0f / 2.0f * fitting_points[i + 1][0];
+							float y = 1.0f / 2.0f * fitting_points[i][1] + 1.0f / 2.0f * fitting_points[i + 1][1];
+							temp.push_back(pointf2(x, y));
+							x = 1.0f / 8.0f * fitting_points[i][0] + 3.0f / 4.0f * fitting_points[i + 1][0] + 1.0f / 8.0f * fitting_points[i + 2][0];
+							y = 1.0f / 8.0f * fitting_points[i][1] + 3.0f / 4.0f * fitting_points[i + 1][1] + 1.0f / 8.0f * fitting_points[i + 2][1];
+							temp.push_back(pointf2(x, y));
+						}
+						float x = 1.0f / 2.0f * fitting_points[n - 2][0] + 1.0f / 2.0f * fitting_points[n - 1][0];
+						float y = 1.0f / 2.0f * fitting_points[n - 2][1] + 1.0f / 2.0f * fitting_points[n - 1][1];
+						temp.push_back(pointf2(x, y));
+						if (e_2 == 1 && n >= 3)
+						{
+							x = 1.0f / 8.0f * fitting_points[n - 2][0] + 3.0f / 4.0f * fitting_points[n - 1][0] + 1.0f / 8.0f * fitting_points[0][0];
+							y = 1.0f / 8.0f * fitting_points[n - 2][1] + 3.0f / 4.0f * fitting_points[n - 1][1] + 1.0f / 8.0f * fitting_points[0][1];
+							temp.push_back(pointf2(x, y));
+							x = 1.0f / 2.0f * fitting_points[n - 1][0] + 1.0f / 2.0f * fitting_points[0][0];
+							y = 1.0f / 2.0f * fitting_points[n - 1][1] + 1.0f / 2.0f * fitting_points[0][1];
+							temp.push_back(pointf2(x, y));
+							x = 1.0f / 8.0f * fitting_points[n - 1][0] + 3.0f / 4.0f * fitting_points[0][0] + 1.0f / 8.0f * fitting_points[1][0];
+							y = 1.0f / 8.0f * fitting_points[n - 1][1] + 3.0f / 4.0f * fitting_points[0][1] + 1.0f / 8.0f * fitting_points[1][1];
+							temp.push_back(pointf2(x, y));
+						}
+						fitting_points = temp;
+					}
+				}
+				else if (e_1 == 3)
+				{
+					fitting_points = data->points;
+					for (int count = 0; count < iterations; count++)
+					{
+						int n = fitting_points.size();
+						vector<pointf2> temp;
+						temp.clear();
+						temp.push_back(fitting_points[0]);
+						if (e_2 == 1 && n >= 4)
+						{
+							float x = (fitting_points[0][0] + fitting_points[1][0]) / 2.0f + alpha * ((fitting_points[0][0] + fitting_points[1][0]) / 2.0f - (fitting_points[n - 1][0] + fitting_points[2][0]) / 2.0f);
+							float y = (fitting_points[0][1] + fitting_points[1][1]) / 2.0f + alpha * ((fitting_points[0][1] + fitting_points[1][1]) / 2.0f - (fitting_points[n - 1][1] + fitting_points[2][1]) / 2.0f);
+							temp.push_back(pointf2(x, y));
+						}
+						for (int i = 1; i < n - 2; i++)
+						{
+							temp.push_back(fitting_points[i]);
+							float x = (fitting_points[i][0] + fitting_points[i + 1][0]) / 2.0f + alpha * ((fitting_points[i][0] + fitting_points[i + 1][0]) / 2.0f - (fitting_points[i - 1][0] + fitting_points[i + 2][0]) / 2.0f);
+							float y = (fitting_points[i][1] + fitting_points[i + 1][1]) / 2.0f + alpha * ((fitting_points[i][1] + fitting_points[i + 1][1]) / 2.0f - (fitting_points[i - 1][1] + fitting_points[i + 2][1]) / 2.0f);
+							temp.push_back(pointf2(x, y));
+						}
+						if (n >= 3)
+							temp.push_back(fitting_points[n - 2]);
+						if (e_2 == 1 && n >= 4)
+						{
+							float x = (fitting_points[n - 2][0] + fitting_points[n - 1][0]) / 2.0f + alpha * ((fitting_points[n - 2][0] + fitting_points[n - 1][0]) / 2.0f - (fitting_points[n - 3][0] + fitting_points[0][0]) / 2.0f);
+							float y = (fitting_points[n - 2][1] + fitting_points[n - 1][1]) / 2.0f + alpha * ((fitting_points[n - 2][1] + fitting_points[n - 1][1]) / 2.0f - (fitting_points[n - 3][1] + fitting_points[0][1]) / 2.0f);
+							temp.push_back(pointf2(x, y));
+						}
+						temp.push_back(fitting_points[n - 1]);
+						if (e_2 == 1 && n >= 4)
+						{
+							float x = (fitting_points[n - 1][0] + fitting_points[0][0]) / 2.0f + alpha * ((fitting_points[n - 1][0] + fitting_points[0][0]) / 2.0f - (fitting_points[n - 2][0] + fitting_points[1][0]) / 2.0f);
+							float y = (fitting_points[n - 1][1] + fitting_points[0][1]) / 2.0f + alpha * ((fitting_points[n - 1][1] + fitting_points[0][1]) / 2.0f - (fitting_points[n - 2][1] + fitting_points[1][1]) / 2.0f);
+							temp.push_back(pointf2(x, y));
+						}
+						fitting_points = temp;
+					}
+				}
 			}
 
 			// Pan (we use a zero mouse threshold when there's no context menu)
@@ -80,7 +203,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				if (data->adding_line)
 					data->points.resize(data->points.size() - 2);
 				data->adding_line = false;
-				if (ImGui::MenuItem("Remove one", NULL, false, data->points.size() > 0)) { data->points.resize(data->points.size() - 2); }
+				if (ImGui::MenuItem("Remove one", NULL, false, data->points.size() > 0)) { data->points.resize(data->points.size() - 1); }
 				if (ImGui::MenuItem("Remove all", NULL, false, data->points.size() > 0)) { data->points.clear(); }
 				ImGui::EndPopup();
 			}
@@ -95,8 +218,15 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				for (float y = fmodf(data->scrolling[1], GRID_STEP); y < canvas_sz.y; y += GRID_STEP)
 					draw_list->AddLine(ImVec2(canvas_p0.x, canvas_p0.y + y), ImVec2(canvas_p1.x, canvas_p0.y + y), IM_COL32(200, 200, 200, 40));
 			}
-			for (int n = 0; n < data->points.size(); n += 2)
-				draw_list->AddLine(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), ImVec2(origin.x + data->points[n + 1][0], origin.y + data->points[n + 1][1]), IM_COL32(255, 255, 0, 255), 2.0f);
+			draw_list->AddCircle(ImVec2(origin.x, origin.y), 3, IM_COL32(255, 0, 0, 255), 0, 2.0f);
+			int n = data->points.size();
+			for (int i = 0; i < n; i++)
+				draw_list->AddCircle(ImVec2(origin.x + data->points[i][0], origin.y + data->points[i][1]), 3, IM_COL32(255, 255, 0, 255), 0, 2.0f);
+			n = fitting_points.size();
+			for (int i = 0; i < n - 1; i++)
+				draw_list->AddLine(ImVec2(origin.x + fitting_points[i][0], origin.y + fitting_points[i][1]), ImVec2(origin.x + fitting_points[i + 1][0], origin.y + fitting_points[i + 1][1]), IM_COL32(255, 255, 0, 255), 2.0f);
+			if (e_2 == 1 && n >= 3)
+				draw_list->AddLine(ImVec2(origin.x + fitting_points[n - 1][0], origin.y + fitting_points[n - 1][1]), ImVec2(origin.x + fitting_points[0][0], origin.y + fitting_points[0][1]), IM_COL32(255, 255, 0, 255), 2.0f);
 			draw_list->PopClipRect();
 		}
 
