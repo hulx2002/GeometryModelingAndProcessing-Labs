@@ -123,6 +123,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					for (int count = 0; count < iterations; count++)
 					{
 						int n = fitting_points.size();
+						if (n < 2) break;
 						vector<pointf2> temp;
 						temp.clear();
 						// 生成新边点和新点点
