@@ -18,17 +18,21 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			ImGui::Checkbox("Enable context menu", &data->opt_enable_context_menu);
 			ImGui::Text("Mouse Left: drag to add lines,\nMouse Right: drag to scroll, click for context menu.");
 
+			// 选择细分方法
 			static int e_1 = 0;
 			ImGui::RadioButton("stop subdivision", &e_1, 0);
 			ImGui::RadioButton("approach chaikin", &e_1, 1);
 			ImGui::RadioButton("approach cubicbspline", &e_1, 2);
 			ImGui::RadioButton("interpolation 4points", &e_1, 3);
+			// 选择开放曲线或闭合曲线
 			static int e_2 = 0;
 			ImGui::RadioButton("open curve", &e_2, 0);
 			ImGui::RadioButton("closed curve", &e_2, 1);
 
+			// 设置迭代次数
 			static int iterations = 0;
 			ImGui::SliderInt("iterations", &iterations, 0, 10);
+			// 设置参数值
 			static float alpha = 0.0f;
 			ImGui::SliderFloat("alpha", &alpha, 0.0f, 0.125f, "%.3f");
 
@@ -75,10 +79,12 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					data->adding_line = false;
 			}
 
+			// 生成细分曲线
 			vector<pointf2> fitting_points;
 			fitting_points.clear();
 			if (e_1 > 0 && data->points.size() >= 2)
 			{
+				// chaikin方法
 				if (e_1 == 1)
 				{
 					fitting_points = data->points;
@@ -87,6 +93,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						int n = fitting_points.size();
 						vector<pointf2> temp;
 						temp.clear();
+						// 生成新边点
 						for (int i = 0; i < n - 1; i++)
 						{
 							float x = 3.0f / 4.0f * fitting_points[i][0] + 1.0f / 4.0f * fitting_points[i + 1][0];
@@ -96,6 +103,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 							y = 1.0f / 4.0f * fitting_points[i][1] + 3.0f / 4.0f * fitting_points[i + 1][1];
 							temp.push_back(pointf2(x, y));
 						}
+						// 闭合曲线情况
 						if (e_2 == 1 && n >= 3)
 						{
 							float x = 3.0f / 4.0f * fitting_points[n - 1][0] + 1.0f / 4.0f * fitting_points[0][0];
@@ -108,6 +116,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						fitting_points = temp;
 					}
 				}
+				// 三次B样条细分方法
 				else if (e_1 == 2)
 				{
 					fitting_points = data->points;
@@ -116,6 +125,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						int n = fitting_points.size();
 						vector<pointf2> temp;
 						temp.clear();
+						// 生成新边点和新点点
 						for (int i = 0; i < n - 2; i++)
 						{
 							float x = 1.0f / 2.0f * fitting_points[i][0] + 1.0f / 2.0f * fitting_points[i + 1][0];
@@ -128,6 +138,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						float x = 1.0f / 2.0f * fitting_points[n - 2][0] + 1.0f / 2.0f * fitting_points[n - 1][0];
 						float y = 1.0f / 2.0f * fitting_points[n - 2][1] + 1.0f / 2.0f * fitting_points[n - 1][1];
 						temp.push_back(pointf2(x, y));
+						// 闭合曲线情况
 						if (e_2 == 1 && n >= 3)
 						{
 							x = 1.0f / 8.0f * fitting_points[n - 2][0] + 3.0f / 4.0f * fitting_points[n - 1][0] + 1.0f / 8.0f * fitting_points[0][0];
@@ -143,6 +154,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						fitting_points = temp;
 					}
 				}
+				// 4点细分方法
 				else if (e_1 == 3)
 				{
 					fitting_points = data->points;
@@ -151,6 +163,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						int n = fitting_points.size();
 						vector<pointf2> temp;
 						temp.clear();
+						// 保留原有顶点，并对每条边增加一个新顶点
 						temp.push_back(fitting_points[0]);
 						if (e_2 == 1 && n >= 4)
 						{
@@ -218,13 +231,18 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				for (float y = fmodf(data->scrolling[1], GRID_STEP); y < canvas_sz.y; y += GRID_STEP)
 					draw_list->AddLine(ImVec2(canvas_p0.x, canvas_p0.y + y), ImVec2(canvas_p1.x, canvas_p0.y + y), IM_COL32(200, 200, 200, 40));
 			}
+			
+			// 标记原点
 			draw_list->AddCircle(ImVec2(origin.x, origin.y), 3, IM_COL32(255, 0, 0, 255), 0, 2.0f);
+			// 标记输入点集
 			int n = data->points.size();
 			for (int i = 0; i < n; i++)
 				draw_list->AddCircle(ImVec2(origin.x + data->points[i][0], origin.y + data->points[i][1]), 3, IM_COL32(255, 255, 0, 255), 0, 2.0f);
+			// 绘制细分曲线
 			n = fitting_points.size();
 			for (int i = 0; i < n - 1; i++)
 				draw_list->AddLine(ImVec2(origin.x + fitting_points[i][0], origin.y + fitting_points[i][1]), ImVec2(origin.x + fitting_points[i + 1][0], origin.y + fitting_points[i + 1][1]), IM_COL32(255, 255, 0, 255), 2.0f);
+			// 闭合曲线情况
 			if (e_2 == 1 && n >= 3)
 				draw_list->AddLine(ImVec2(origin.x + fitting_points[n - 1][0], origin.y + fitting_points[n - 1][1]), ImVec2(origin.x + fitting_points[0][0], origin.y + fitting_points[0][1]), IM_COL32(255, 255, 0, 255), 2.0f);
 			draw_list->PopClipRect();
