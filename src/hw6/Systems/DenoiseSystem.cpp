@@ -6,6 +6,8 @@
 
 #include <spdlog/spdlog.h>
 
+#define PI acos(-1)
+
 using namespace Ubpa;
 
 void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
@@ -131,6 +133,55 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					*data->mesh = data->copy;
 
 					spdlog::info("recover success");
+				}();
+			}
+
+			static int iterations = 0;
+			static float lambda = 0.f;
+			ImGui::SliderInt("iterations", &iterations, 0, 1000);
+			ImGui::SliderFloat("lambda", &lambda, 0.f, 0.1f, "%.3f");
+			if (ImGui::Button("Minimal Surface")) {
+				[&]() {
+					if (!data->heMesh->IsTriMesh() || data->heMesh->IsEmpty()) {
+						spdlog::warn("HEMesh isn't triangle mesh or is empty");
+						return;
+					}
+
+					const size_t N = data->heMesh->Vertices().size();
+					std::vector<Ubpa::pointf3> positions(N);
+					for (int count = 0; count < iterations; count++) {
+						for (size_t i = 0; i < N; i++) {
+							auto P = data->heMesh->Vertices().at(i);
+							if (P->IsOnBoundary()) {
+								positions[i] = P->position;
+							}
+							else {
+								Ubpa::vecf3 Hn = Ubpa::vecf3{ 0.f };
+								float A = 0.f;
+								for (auto Q_alpha : P->AdjVertices()) {
+									auto Q_beta = P->HalfEdgeTo(Q_alpha)->Next()->End();
+									float P_Qalpha = P->position.distance(Q_alpha->position);
+									float P_Qbeta = P->position.distance(Q_beta->position);
+									float Qalpha_Qbeta = Q_alpha->position.distance(Q_beta->position);
+									float alpha = acos((pow(P_Qalpha, 2) + pow(Qalpha_Qbeta, 2) - pow(P_Qbeta, 2)) / (2.f * P_Qalpha * Qalpha_Qbeta));
+									float beta = acos((pow(P_Qbeta, 2) + pow(Qalpha_Qbeta, 2) - pow(P_Qalpha, 2)) / (2.f * P_Qbeta * Qalpha_Qbeta));
+									Hn += 1.f / tan(alpha) * (P->position - Q_beta->position) + 1.f / tan(beta) * (P->position - Q_alpha->position);
+									if (alpha > PI / 2.f || beta > PI / 2.f)
+										A += P_Qalpha * P_Qbeta * sin(PI - alpha - beta) / 8.f;
+									else if (PI - alpha - beta > PI / 2.f)
+										A += P_Qalpha * P_Qbeta * sin(PI - alpha - beta) / 4.f;
+									else
+										A += (1.f / tan(alpha) * pow(P_Qbeta, 2) + 1.f / tan(beta) * pow(P_Qalpha, 2)) / 8.f;
+								}
+								Hn /= (2.f * A);
+								positions[i] = P->position - lambda * Hn;
+							}
+						}
+						for (size_t i = 0; i < N; i++)
+							data->heMesh->Vertices().at(i)->position = positions[i];
+					}
+
+					spdlog::info("minimal surface success");
 				}();
 			}
 		}
