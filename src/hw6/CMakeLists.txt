@@ -21,4 +21,5 @@ Ubpa_AddTarget(
   LIB
     Ubpa::Utopia_App_Editor
     Ubpa::UHEMesh_core
+  INC "${PROJECT_SOURCE_DIR}/include/_deps"
 )
