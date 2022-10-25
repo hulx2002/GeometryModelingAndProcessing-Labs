@@ -11,10 +11,12 @@ using namespace Ubpa;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 
-typedef CGAL::Delaunay_triangulation_2<K>  Triangulation;
-typedef Triangulation::Edge_iterator  Edge_iterator;
-typedef Triangulation::Vertex_iterator  Vertex_iterator;
-typedef Triangulation::Point          Point;
+typedef CGAL::Delaunay_triangulation_2<K> Triangulation;
+typedef Triangulation::Vertex_iterator Vertex_iterator;
+typedef Triangulation::Edge_iterator Edge_iterator;
+typedef Triangulation::Point Point;
+
+typedef Triangulation::Edge_circulator Edge_circulator;
 
 void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 	schedule.RegisterCommand([](Ubpa::UECS::World* w) {
@@ -27,10 +29,14 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			ImGui::Checkbox("Enable context menu", &data->opt_enable_context_menu);
 			ImGui::Text("Mouse Left: drag to add lines,\nMouse Right: drag to scroll, click for context menu.");
 
+			// 在给定的矩形区域内随机生成若干采样点
+			// 矩形区域控制点
 			static pointf2 region_p0 = pointf2(0.f, 0.f);
 			static pointf2 region_p1 = pointf2(100.f, 100.f);
+			// 采样点数量
 			static int points_number = 0;
 			ImGui::InputInt("Enter number of random points", &points_number);
+			// 随机生成采样点
 			if (ImGui::Button("Insert random points")) {
 				data->points.clear();
 				for (int i = 0; i < points_number; i++) {
@@ -40,18 +46,78 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				}
 			}
 
+			// 生成这些点的Delaunay三角化和Voronoi剖分
+			// 绘制Voronoi图
 			static bool opt_enable_voronoi_diagram = false;
 			ImGui::Checkbox("Show Voronoi Diagram", &opt_enable_voronoi_diagram);
+			// Delaunay三角化
 			Triangulation T;
 			std::vector<Point> delaunay_triangulation_points;
 			for (int i = 0; i < data->points.size(); i++)
 				delaunay_triangulation_points.push_back(Point(data->points[i][0], data->points[i][1]));
 			T.insert(delaunay_triangulation_points.begin(), delaunay_triangulation_points.end());
 
+			// 实现Lloyd算法
+			// 迭代次数
 			static int iterations = 0;
 			ImGui::InputInt("Enter iterations", &iterations);
+			// 开始迭代
 			if (ImGui::Button("Start Lloyd algorithm")) {
-
+				for (int i = 0; i < iterations; i++) {
+					// 计算每个剖分的重心，将采样点的位置更新到该重心
+					data->points.clear();
+					// 遍历三角网格顶点
+					Vertex_iterator vit = T.vertices_begin();
+					for (; vit != T.vertices_end(); ++vit) {
+						float x = 0.f, y = 0.f;
+						int degree = 0;
+						// 遍历顶点的相邻有限边，并求其对偶
+						Edge_circulator ec = T.incident_edges(vit), done(ec);
+						if (ec != nullptr) {
+							do {
+								if (!T.is_infinite(ec)) {
+									CGAL::Object o = T.dual(ec);
+									// 对偶边为线段，更新剖分的重心坐标
+									if (CGAL::object_cast<K::Segment_2>(&o)) {
+										auto segment_temp = CGAL::object_cast<K::Segment_2>(&o);
+										x += segment_temp->source().x() + segment_temp->target().x();
+										y += segment_temp->source().y() + segment_temp->target().y();
+										degree += 2;
+									}
+									// 对偶边为射线，剖分非闭合，采样点位置不变
+									else if (CGAL::object_cast<K::Ray_2>(&o)) {
+										degree = 0;
+										break;
+									}
+								}
+							} while (++ec != done);
+						}
+						// 对偶边为射线，剖分非闭合，采样点位置不变
+						if (degree == 0)
+							data->points.push_back(pointf2(vit->point().x(), vit->point().y()));
+						// 对偶边为线段，根据剖分的重心坐标，更新采样点的位置
+						else {
+							x /= degree;
+							y /= degree;
+							// 检查采样点是否超出矩形区域
+							if (x > region_p0[0] && x > region_p1[0])
+								x = region_p0[0] > region_p1[0] ? region_p0[0] : region_p1[0];
+							else if (x < region_p0[0] && x < region_p1[0])
+								x = region_p0[0] < region_p1[0] ? region_p0[0] : region_p1[0];
+							if (y > region_p0[1] && y > region_p1[1])
+								y = region_p0[1] > region_p1[1] ? region_p0[1] : region_p1[1];
+							else if (y < region_p0[1] && y < region_p1[1])
+								y = region_p0[1] < region_p1[1] ? region_p0[1] : region_p1[1];
+							data->points.push_back(pointf2(x, y));
+						}
+					}
+					// 生成这些点的Delaunay三角化和Voronoi剖分
+					T.clear();
+					delaunay_triangulation_points.clear();
+					for (int i = 0; i < data->points.size(); i++)
+						delaunay_triangulation_points.push_back(Point(data->points[i][0], data->points[i][1]));
+					T.insert(delaunay_triangulation_points.begin(), delaunay_triangulation_points.end());
+				}
 			}
 
 			// Typically you would use a BeginChild()/EndChild() pair to benefit from a clipping region + own scrolling.
@@ -86,6 +152,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			const pointf2 mouse_pos_in_canvas(io.MousePos.x - origin.x, io.MousePos.y - origin.y);
 
 			// Add first and second point
+			// 选择矩形区域
 			if (is_hovered && !data->adding_line && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
 				region_p0 = mouse_pos_in_canvas;
@@ -132,13 +199,13 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				for (float y = fmodf(data->scrolling[1], GRID_STEP); y < canvas_sz.y; y += GRID_STEP)
 					draw_list->AddLine(ImVec2(canvas_p0.x, canvas_p0.y + y), ImVec2(canvas_p1.x, canvas_p0.y + y), IM_COL32(200, 200, 200, 40));
 			}
-			/*
-			for (int n = 0; n < data->points.size(); n += 2)
-				draw_list->AddLine(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), ImVec2(origin.x + data->points[n + 1][0], origin.y + data->points[n + 1][1]), IM_COL32(255, 255, 0, 255), 2.0f);
-			*/
 			draw_list->AddRect(ImVec2(origin.x + region_p0[0], origin.y + region_p0[1]), ImVec2(origin.x + region_p1[0], origin.y + region_p1[1]), IM_COL32(255, 255, 0, 255));
+			
+			// 绘制采样点
 			for (int n = 0; n < data->points.size(); n++)
 				draw_list->AddCircle(ImVec2(origin.x + data->points[n][0], origin.y + data->points[n][1]), 3, IM_COL32(255, 0, 255, 255));
+			
+			// 绘制Voronoi剖分
 			if (opt_enable_voronoi_diagram) {
 				Edge_iterator eit = T.edges_begin();
 				for (; eit != T.edges_end(); ++eit) {
@@ -153,6 +220,7 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					}
 				}
 			}
+			
 			draw_list->PopClipRect();
 		}
 
