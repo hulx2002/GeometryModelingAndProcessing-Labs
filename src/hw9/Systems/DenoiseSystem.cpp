@@ -151,6 +151,8 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						return;
 					}
 
+					n = n < 3 ? 3 : n;
+
 					// 计算所有初始顶点的Q矩阵
 					vector<Matrix4f> Qs;
 					// 遍历顶点
@@ -210,6 +212,8 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						Vector4f v_selected;
 						// 选择所有有效点对
 						for (auto* e : data->heMesh->Edges()) {
+							if (!data->heMesh->IsCollapsable(e))
+								continue;
 							auto* vi = e->HalfEdge()->Origin();
 							auto* vj = e->HalfEdge()->End();
 							size_t i = data->heMesh->Index(vi);
@@ -251,6 +255,8 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 								v_selected = v_temp;
 							}
 						}
+						if (error_min == -1.f)
+							break;
 						auto* vi = e_selected->HalfEdge()->Origin();
 						auto* vj = e_selected->HalfEdge()->End();
 						size_t i = data->heMesh->Index(vi);
@@ -273,6 +279,8 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 						Qs[j] = Qs.back();
 						Qs.pop_back();
 					}
+
+					n = data->heMesh->Vertices().size();
 
 					spdlog::info("simplification success");
 				}();
