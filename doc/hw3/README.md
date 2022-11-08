@@ -4,7 +4,7 @@
 
 - 输入点集  
 - 选择参数化方法为 `Uniform parameterization`  
-- 选择高斯基函数的参数 $sigma=1$  
+- 选择高斯基函数的参数 $\sigma=1$  
 
 ![uniform](images/uniform.jpg)
 
