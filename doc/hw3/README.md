@@ -1,4 +1,4 @@
-# 作业 3  
+# 作业 3（参数曲线拟合）  
 
 **1. Uniform parameterization**  
 
