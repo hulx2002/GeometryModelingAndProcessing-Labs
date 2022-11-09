@@ -70,16 +70,16 @@ $iterations=1000$
 
 $iterations=250$  
 
-![Nefertiti_face_250](images/Nefertiti_face_250.jpg)
+![nefertiti_face_250](images/nefertiti_face_250.jpg)
 
 $iterations=500$  
 
-![Nefertiti_face_500](images/Nefertiti_face_500.jpg)
+![nefertiti_face_500](images/nefertiti_face_500.jpg)
 
 $iterations=750$  
 
-![Nefertiti_face_750](images/Nefertiti_face_750.jpg)
+![nefertiti_face_750](images/nefertiti_face_750.jpg)
 
 $iterations=1000$  
 
-![Nefertiti_face_1000](images/Nefertiti_face_1000.jpg)
+![nefertiti_face_1000](images/nefertiti_face_1000.jpg)
