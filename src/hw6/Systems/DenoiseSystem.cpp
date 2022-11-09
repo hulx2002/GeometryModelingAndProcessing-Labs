@@ -136,6 +136,7 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 				}();
 			}
 
+			// 输入迭代次数和参数
 			static int iterations = 0;
 			static float lambda = 0.f;
 			ImGui::SliderInt("iterations", &iterations, 0, 1000);
@@ -149,15 +150,21 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 
 					const size_t N = data->heMesh->Vertices().size();
 					std::vector<Ubpa::pointf3> positions(N);
+					// 迭代给定次数
 					for (int count = 0; count < iterations; count++) {
+						// 遍历顶点
 						for (size_t i = 0; i < N; i++) {
 							auto P = data->heMesh->Vertices().at(i);
+							// 固定边界顶点
 							if (P->IsOnBoundary()) {
 								positions[i] = P->position;
 							}
+							// 内部顶点
 							else {
+								// 计算离散平均曲率
 								Ubpa::vecf3 Hn = Ubpa::vecf3{ 0.f };
 								float A = 0.f;
+								// 遍历顶点1-领域
 								for (auto Q_alpha : P->AdjVertices()) {
 									auto Q_beta = P->HalfEdgeTo(Q_alpha)->Next()->End();
 									float P_Qalpha = P->position.distance(Q_alpha->position);
@@ -174,6 +181,7 @@ void DenoiseSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 										A += (1.f / tan(alpha) * pow(P_Qbeta, 2) + 1.f / tan(beta) * pow(P_Qalpha, 2)) / 8.f;
 								}
 								Hn /= (2.f * A);
+								// 更新坐标
 								positions[i] = P->position - lambda * Hn;
 							}
 						}
